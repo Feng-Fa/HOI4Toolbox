@@ -1,0 +1,5 @@
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net6.0-windows\HOI4Toolbox.csproj.AssemblyReference.cache
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net6.0-windows\HOI4Toolbox.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net6.0-windows\HOI4Toolbox.AssemblyInfoInputs.cache
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net6.0-windows\HOI4Toolbox.AssemblyInfo.cs
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net6.0-windows\HOI4Toolbox.csproj.CoreCompileInputs.cache

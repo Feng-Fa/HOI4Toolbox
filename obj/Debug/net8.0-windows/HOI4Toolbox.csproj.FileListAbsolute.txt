@@ -1,0 +1,15 @@
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\app.manifest
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\HOI4Toolbox.exe
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\HOI4Toolbox.deps.json
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\HOI4Toolbox.runtimeconfig.json
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\HOI4Toolbox.dll
+C:\Users\Admin\.vscode\HOI4Toolbox\bin\Debug\net8.0-windows\HOI4Toolbox.pdb
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.AssemblyInfoInputs.cache
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.AssemblyInfo.cs
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.csproj.CoreCompileInputs.cache
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.dll
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\refint\HOI4Toolbox.dll
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.pdb
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\HOI4Toolbox.genruntimeconfig.cache
+C:\Users\Admin\.vscode\HOI4Toolbox\obj\Debug\net8.0-windows\ref\HOI4Toolbox.dll
