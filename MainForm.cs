@@ -1,20 +1,14 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Net;
-using System.Reflection;
-using System.Runtime.Versioning;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.IO.Compression;
+using System.Reflection;
+using System.Security;
+using System.Text;
+using System.Windows.Forms;
 
 namespace HOI4Toolbox
 {
-    [SupportedOSPlatform("windows")]
     public partial class MainForm : Form
     {
         private static readonly Color[] ButtonColors = 
@@ -131,7 +125,7 @@ namespace HOI4Toolbox
                     StartGameDownload();
                     break;
                 case 2:
-                    RunModExe();
+                    DownloadMod();
                     break;
                 case 3:
                     RegisterMod();
@@ -145,11 +139,10 @@ namespace HOI4Toolbox
             }
         }
 
-        #region 功能一：下载游戏（使用外部脚本）
-
+        #region 功能一：下载游戏
         private void StartGameDownload()
         {
-            var outputDir = GetDownloadDirectory();
+            string outputDir = GetDownloadDirectory();
             if (string.IsNullOrEmpty(outputDir))
             {
                 MessageBox.Show("无法确定下载目录", "错误", 
@@ -157,60 +150,58 @@ namespace HOI4Toolbox
                 return;
             }
 
-            // 删除旧的完成标记文件（如果存在）
             try
             {
-                File.Delete(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "win.txt"));
+                Directory.CreateDirectory(outputDir);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"无法创建下载目录: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string completionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "win.txt");
+            try
+            {
+                if (File.Exists(completionFile))
+                {
+                    File.Delete(completionFile);
+                }
             }
             catch { }
 
             var progressDialog = new DownloadProgressDialog();
             progressDialog.Show(this);
             
-            // 启动监控线程
-            Task.Run(() => MonitorDownloadCompletion(progressDialog, outputDir));
+            Task.Run(() => MonitorDownloadCompletion(progressDialog));
             
-            // 启动下载脚本
             Task.Run(() => RunExternalDownloadScript(
-                "https://data.alloyhe.top/d/Onedrive/Heart%20of%20Iron%20IV/Vanilla/Windows/Hearts%20of%20Iron%20IV%20v.1.16.9.zip",
+                "https://alloysa-my.sharepoint.com/personal/admin_hejincn_com/_layouts/15/download.aspx?UniqueId=71910ad2-300f-4412-956a-5e01e1fdf214",
                 outputDir,
                 progressDialog.UpdateProgress
             ));
         }
 
-        private void MonitorDownloadCompletion(DownloadProgressDialog dialog, string outputDir)
+        private void MonitorDownloadCompletion(DownloadProgressDialog dialog)
         {
             string completionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "win.txt");
             
-            // 检查文件是否存在，最多等待30分钟
             for (int i = 0; i < 1800; i++)
             {
                 if (File.Exists(completionFile))
                 {
-                    // 在主线程执行UI操作
                     this.Invoke(new Action(() =>
                     {
                         dialog.Close();
                         MessageBox.Show("下载已完成！", "完成", 
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        
-                        // 打开下载目录
-                        try
-                        {
-                            Process.Start("explorer.exe", outputDir);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"无法打开下载目录: {ex.Message}", "警告", 
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
                     }));
                     return;
                 }
-                System.Threading.Thread.Sleep(1000); // 每秒检查一次
+                System.Threading.Thread.Sleep(1000);
             }
             
-            // 超时处理
             this.Invoke(new Action(() =>
             {
                 dialog.Close();
@@ -223,19 +214,16 @@ namespace HOI4Toolbox
         {
             try
             {
-                // 提取aria2二进制文件
+                string appDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory).TrimEnd('\\');
+
                 string? ariaPath = ExtractAria2Binary();
                 if (ariaPath == null)
                 {
-                    progressHandler?.Invoke(new Aria2ProgressData
-                    {
-                        ErrorMessage = "无法找到或提取下载工具"
-                    });
+                    progressHandler(new Aria2ProgressData { ErrorMessage = "无法提取下载工具" });
                     return;
                 }
                 
-                // 将批处理文件提取到应用程序目录（非临时目录）
-                string batPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "download_game.bat");
+                string batPath = Path.Combine(appDir, "download_game.bat");
                 try
                 {
                     using (var stream = Assembly.GetExecutingAssembly()
@@ -250,23 +238,20 @@ namespace HOI4Toolbox
                 }
                 catch (Exception ex)
                 {
-                    progressHandler?.Invoke(new Aria2ProgressData
-                    {
-                        ErrorMessage = $"提取脚本失败: {ex.Message}"
-                    });
+                    progressHandler(new Aria2ProgressData { ErrorMessage = $"提取脚本失败: {ex.Message}" });
                     return;
                 }
 
-                // 构建参数（不对URL编码）
-                string arguments = $"\"{url}\" \"{outputDir}\" \"{ariaPath}\" \"{AppDomain.CurrentDomain.BaseDirectory}\"";
+                string arguments = $"\"{url}\" \"{outputDir}\" \"{ariaPath}\" \"{appDir}\"";
 
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = "cmd.exe",  // 使用cmd.exe作为宿主
-                    Arguments = $"/c \"\"{batPath}\" {arguments}\"",  // 双重引号确保路径安全
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"\"{batPath}\" {arguments}\"",
                     UseShellExecute = true,
                     WindowStyle = ProcessWindowStyle.Normal,
-                    CreateNoWindow = false
+                    CreateNoWindow = false,
+                    WorkingDirectory = appDir
                 };
 
                 using (var process = new Process { StartInfo = startInfo })
@@ -276,26 +261,23 @@ namespace HOI4Toolbox
 
                     if (process.ExitCode != 0)
                     {
-                        progressHandler?.Invoke(new Aria2ProgressData
-                        {
-                            ErrorMessage = $"下载失败，错误代码: {process.ExitCode}"
-                        });
+                        progressHandler(new Aria2ProgressData { ErrorMessage = $"下载失败，错误代码: {process.ExitCode}" });
                     }
                 }
             }
             catch (Exception ex)
             {
-                progressHandler?.Invoke(new Aria2ProgressData
-                {
-                    ErrorMessage = $"下载失败: {ex.Message}"
-                });
+                progressHandler(new Aria2ProgressData { ErrorMessage = $"下载失败: {ex.Message}" });
             }
             finally
             {
                 try
                 {
-                    // 清理临时文件
-                    Directory.Delete(Path.Combine(Path.GetTempPath(), "HOI4Download"), true);
+                    string tempDir = Path.Combine(Path.GetTempPath(), "HOI4Download");
+                    if (Directory.Exists(tempDir))
+                    {
+                        Directory.Delete(tempDir, true);
+                    }
                 }
                 catch { }
             }
@@ -322,33 +304,57 @@ namespace HOI4Toolbox
             {
                 bool is64Bit = Environment.Is64BitOperatingSystem;
                 string resourceName = is64Bit ? "aria2-64.exe" : "aria2-32.exe";
-                return ExtractResourceToTempFile(resourceName);
+                string appDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory).TrimEnd('\\');
+                string targetPath = Path.Combine(appDir, resourceName);
+                
+                using (var stream = Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream($"HOI4Toolbox.Resources.{resourceName}"))
+                {
+                    if (stream == null) return null;
+                    using (var file = File.Create(targetPath))
+                    {
+                        stream.CopyTo(file);
+                    }
+                }
+                return targetPath;
             }
             catch
             {
                 return null;
             }
         }
-
         #endregion
 
-        #region 功能二：运行MOD程序
-
-        private void RunModExe()
+        #region 功能二：下载MOD
+        private void DownloadMod()
         {
             try
             {
-                var modExePath = ExtractResourceToTempFile("mod.exe");
-                if (modExePath == null)
-                {
-                    MessageBox.Show("找不到MOD程序", "错误", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+                string tempExePath = Path.GetTempFileName() + ".exe";
                 
+                // 根据系统架构提取正确的资源
+                string resourceName = Environment.Is64BitOperatingSystem ? 
+                    "mod64.exe" : "mod32.exe";
+                
+                using (var stream = Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream($"HOI4Toolbox.Resources.{resourceName}"))
+                {
+                    if (stream == null)
+                    {
+                        MessageBox.Show("找不到MOD下载程序", "资源错误",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    
+                    using (var file = File.Create(tempExePath))
+                    {
+                        stream.CopyTo(file);
+                    }
+                }
+
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = modExePath,
+                    FileName = tempExePath,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -360,136 +366,169 @@ namespace HOI4Toolbox
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"启动MOD程序失败: {ex.Message}", "错误", 
+                MessageBox.Show($"MOD下载失败: {ex.Message}", "错误", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         #endregion
 
         #region 功能三：注册模组
-
         private void RegisterMod()
         {
-            var path = PromptDialog.Show("注册模组", "请输入模组安装路径:", "");
-            if (string.IsNullOrWhiteSpace(path)) return;
+            string targetDir = PromptDialog.Show("模组注册", "请输入模组安装目录路径:", "");
+            if (string.IsNullOrWhiteSpace(targetDir)) return;
 
             try
             {
-                var batPath = ExtractResourceToTempFile("mod.bat");
-                if (batPath == null)
+                targetDir = Path.GetFullPath(targetDir).TrimEnd('\\');
+                
+                if (!Directory.Exists(targetDir))
                 {
-                    MessageBox.Show("找不到模组注册脚本", "错误", 
+                    MessageBox.Show("指定目录不存在", "路径错误",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                var process = new Process
+                // 从资源中提取批处理文件
+                string batPath = Path.Combine(targetDir, "mod.bat");
+                using (var stream = Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream("HOI4Toolbox.Resources.mod.bat"))
                 {
-                    StartInfo = new ProcessStartInfo
+                    if (stream == null)
                     {
-                        FileName = batPath,
-                        WorkingDirectory = path,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                
-                MessageBox.Show("模组注册成功", "成功", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"注册失败: {ex.Message}", "错误", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        #endregion
-
-        #region 功能四：加载补丁
-
-        private void LoadPatch()
-        {
-            var path = PromptDialog.Show("加载补丁", "请输入游戏安装路径:", "");
-            if (string.IsNullOrWhiteSpace(path)) return;
-
-            try
-            {
-                var zipPath = ExtractResourceToTempFile("buding.zip");
-                if (zipPath == null)
-                {
-                    MessageBox.Show("找不到补丁文件", "错误", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                MessageBox.Show("开始解压补丁...", "处理中", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                
-                ZipFile.ExtractToDirectory(zipPath, path, true);
-                MessageBox.Show($"成功加载补丁文件", "完成", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"补丁加载失败: {ex.Message}", "错误", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        #endregion
-
-        #region 辅助方法
-
-        private string? ExtractResourceToTempFile(string resourceName, string? extension = null)
-        {
-            try
-            {
-                Assembly? assembly = Assembly.GetExecutingAssembly();
-                if (assembly == null) return null;
-                
-                var tempPath = Path.GetTempFileName();
-                
-                if (!string.IsNullOrEmpty(extension))
-                {
-                    tempPath = Path.ChangeExtension(tempPath, extension);
-                }
-
-                string fullResourceName = $"{assembly.GetName().Name}.Resources.{resourceName}";
-                using (var stream = assembly.GetManifestResourceStream(fullResourceName))
-                {
-                    if (stream == null) 
-                    {
-                        // 列出所有资源帮助调试
-                        Debug.WriteLine("可用的资源:");
-                        foreach (var name in assembly.GetManifestResourceNames())
-                        {
-                            Debug.WriteLine(name);
-                        }
-                        return null;
+                        MessageBox.Show("找不到模组注册脚本", "资源错误",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
                     }
                     
-                    using (var file = File.Create(tempPath))
+                    using (var file = File.Create(batPath))
                     {
                         stream.CopyTo(file);
                     }
                 }
-                return tempPath;
+
+                MessageBox.Show($"mod.bat 已复制到: {batPath}", "操作成功",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show("没有写入权限，请尝试管理员身份运行", "权限不足",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"资源提取失败: {ex.Message}", "错误", 
+                MessageBox.Show($"注册失败: {ex.Message}", "错误",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return null;
             }
         }
+        #endregion
 
+        #region 功能四：加载补丁
+        private void LoadPatch()
+        {
+            string gamePath = PromptDialog.Show("加载补丁", "请输入游戏安装路径:", "");
+            if (string.IsNullOrWhiteSpace(gamePath)) return;
+
+            try
+            {
+                gamePath = Path.GetFullPath(gamePath).TrimEnd('\\');
+                
+                // 验证游戏路径
+                if (!Directory.Exists(gamePath))
+                {
+                    MessageBox.Show("指定的游戏目录不存在", "路径错误",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // 可选：确认是否为有效的HOI4路径
+                string exePath = Path.Combine(gamePath, "hoi4.exe");
+                if (!File.Exists(exePath))
+                {
+                    var result = MessageBox.Show("未找到hoi4.exe，确认继续吗？", "路径确认",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (result != DialogResult.Yes) return;
+                }
+
+                // 创建临时ZIP文件路径
+                string tempZipPath = Path.GetTempFileName() + ".zip";
+                try
+                {
+                    // 从资源中提取ZIP文件
+                    using (var stream = Assembly.GetExecutingAssembly()
+                        .GetManifestResourceStream("HOI4Toolbox.Resources.buding.zip"))
+                    {
+                        if (stream == null)
+                            throw new FileNotFoundException("找不到补丁资源文件");
+                        
+                        using (var file = File.Create(tempZipPath))
+                        {
+                            stream.CopyTo(file);
+                        }
+                    }
+
+                    // 安全解压ZIP文件
+                    using (var archive = ZipFile.OpenRead(tempZipPath))
+                    {
+                        foreach (var entry in archive.Entries)
+                        {
+                            // 防止路径遍历攻击
+                            string destPath = Path.GetFullPath(Path.Combine(gamePath, entry.FullName));
+                            if (!destPath.StartsWith(gamePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                throw new SecurityException("检测到非法的文件路径: " + entry.FullName);
+                            }
+
+                            // 创建目标目录（如果不存在）
+                            string? dirPath = Path.GetDirectoryName(destPath);
+                            if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+                            {
+                                Directory.CreateDirectory(dirPath);
+                            }
+
+                            // 如果是文件而非目录
+                            if (!string.IsNullOrEmpty(entry.Name))
+                            {
+                                entry.ExtractToFile(destPath, overwrite: true);
+                            }
+                        }
+                    }
+
+                    MessageBox.Show("补丁已成功加载！", "操作完成",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"解压补丁失败: {ex.Message}", "错误",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    // 清理临时文件
+                    try
+                    {
+                        if (File.Exists(tempZipPath))
+                            File.Delete(tempZipPath);
+                    }
+                    catch { }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show("需要管理员权限来修改游戏文件", "权限不足",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载补丁失败: {ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         #endregion
     }
 
-    #region 辅助类和结构体
-    
+    #region 辅助类和对话框
+
     public struct Aria2ProgressData
     {
         public int Percent;
@@ -520,15 +559,12 @@ namespace HOI4Toolbox
         private void InitializeComponent()
         {
             this.SuspendLayout();
-            
-            // 窗体设置
             this.Text = "下载进度";
             this.ClientSize = new Size(500, 350);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             
-            // 主容器
             var mainPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -548,7 +584,6 @@ namespace HOI4Toolbox
             };
             progressLayout.Controls.Add(progressBar);
             progressLayout.Controls.Add(percentLabel);
-            
             progressPanel.Controls.Add(progressLayout);
             mainPanel.Controls.Add(progressPanel);
             
@@ -598,18 +633,6 @@ namespace HOI4Toolbox
                 return;
             }
             
-            if (!string.IsNullOrEmpty(data.WarningMessage))
-            {
-                logBox.AppendText($"[警告] {data.WarningMessage}\r\n");
-                return;
-            }
-            
-            if (!string.IsNullOrEmpty(data.LogMessage))
-            {
-                logBox.AppendText($"[信息] {data.LogMessage}\r\n");
-                return;
-            }
-            
             if (data.Percent > 0)
             {
                 progressBar.Value = Math.Min(Math.Max(data.Percent, 0), 100);
@@ -653,7 +676,6 @@ namespace HOI4Toolbox
             var okButton = new Button() { Text = "确定", Left = 180, Width = 70, Top = 80, DialogResult = DialogResult.OK };
             var cancelButton = new Button() { Text = "取消", Left = 260, Width = 70, Top = 80, DialogResult = DialogResult.Cancel };
             
-            okButton.Click += (sender, e) => { form.Close(); };
             form.AcceptButton = okButton;
             form.CancelButton = cancelButton;
             

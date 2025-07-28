@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HOI4Toolbox")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b9d8293389d88b14fbf6d02417c12c5cee0c19fc")]
 [assembly: System.Reflection.AssemblyProductAttribute("HOI4Toolbox")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HOI4Toolbox")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
